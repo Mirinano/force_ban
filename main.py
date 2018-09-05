@@ -3,8 +3,7 @@ import discord
 
 client = discord.Client()
 
-master_server_id = "399233416962244608" #ここに管理者連絡室のID
-master_cmd_id = "486797480764375065" #ここ横断BAN実行専用チャンネルのID
+master_cmd_id = "" #ここに管理者連絡室内の横断BAN実行専用チャンネルのID
 
 @asyncio.coroutine
 def force_ban(user_id, server_id, delete_message_days=1):
