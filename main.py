@@ -56,7 +56,7 @@ async def on_message(message):
                         result = "err"
                     elif target_reaction.reaction.emoji == "⭕":
                         reaction_count["done"] += 1
-                        if reaction_count["done"] == 3:
+                        if reaction_count["done"] == 5:
                             loop = None
                             result = "done"
                         else:
