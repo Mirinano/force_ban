@@ -53,10 +53,7 @@ async def on_message(message):
     message_time_str = message_time.strftime("%Y/%m/%d %H:%M:%S") + "(UTS)"
     msg_time_ym = message_time.strftime("%Y-%m")
     file_dir = ""
-    if msg_ch.is_private:
-        file_name = "message_log/" + msg_time_ym + "/DM.txt"
-    else:
-        file_name = "message_log/" + msg_time_ym + "/" + msg_ch_name + ".txt"
+    file_name = "message_log/" + msg_time_ym + "/" + msg_ch_name + ".txt"
     file_dir = os.path.dirname(file_name)
     if not os.path.exists(file_dir):
         os.makedirs(file_dir)
