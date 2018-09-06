@@ -8,7 +8,7 @@ client = discord.Client()
 
 master_cmd_id = "" #ここに管理者連絡室内の横断BAN実行専用チャンネルのID
 
-stop_time = 60 #実行受理から緊急停止までの猶予☆☆
+stop_time = 60 #実行受理から緊急停止までの猶予
 
 # force_ban, force_un_ban
 done_number = 3 #実行に必要な⭕の数
@@ -137,11 +137,9 @@ async def on_message(message):
                 await client.send_message(message.channel, deal_content + "をキャンセルしました。\n" + accept_count_content)
             elif result == "done": #実行。
                 await client.send_message(send_ch, deal_content + "を1分後に実行します。\n実行前に緊急停止するときには「!stop」と書き込んでください。\n" + accept_count_content)
-                count_down_start = datetime.datetime.now()
-                stop_time = 60
                 while True:
                     stop_msg = await client.wait_for_message(timeout=stop_time, content="!stop", channel=message.channel)
-                    if ((stop_msg == None) or (stop_time <= 0)):
+                    if stop_msg == None:
                         await client.send_message(send_ch, deal_content + "を実行します。\n" + accept_count_content)
                         done_server = list()
                         fail_server = list()
@@ -174,9 +172,8 @@ async def on_message(message):
                         else:
                             await client.send_message(send_ch, "【実行エラー】\n<@391943696809197568> プログラムコードに異常が起きている可能性があります。BOTを強制停止(サーバーを停止)させてください。\n" + accept_count_content) #ミリナノにメンションで警告
                         break
-                    else: # "!stop"ではなかった。~~なんだよ！~~
-                        elapsed_time = datetime.datetime.now() - count_down_start #経過時間を計測
-                        stop_time = stop_time - int(elapsed_time.seconds)
+                    else: # "!stop"だ！
+                        await client.send_message(send_ch, "すべての処理を強制終了します。\n" + accept_count_content)
         elif (message.content.startswith("$past_ban") or message.content.startswith("$past_unban")): #過去にさかのぼってログにあるすべてのアカウントをBAN(解除)します。
             if message.content.startswith("$past_ban"):
                 deal = "ban"
@@ -264,8 +261,6 @@ async def on_message(message):
                     await client.send_message(send_ch, deal_content + "をキャンセルしました。\n" + accept_count_content)
                 elif result == "done": #実行
                     await client.send_message(send_ch, deal_content + "を1分後に実行します。\n実行前に緊急停止するときには「!stop」と書き込んでください。\n" + accept_count_content)
-                    count_down_start = datetime.datetime.now()
-                    stop_time = 60
                     while True:
                         stop_msg = await client.wait_for_message(timeout=stop_time, content="!stop", channel=message.channel)
                         if ((stop_msg == None) or (stop_time <= 0)):
@@ -293,12 +288,12 @@ async def on_message(message):
                             result_content = deal_content + "が完了しました。\n実行したユーザー\n```\n" + "\n".join(done_user) + "\n```\n失敗したユーザー\n```\n" + "\n".join(fail_user) + "\n```\n" + accept_count_content
                             await client.send_message(send_ch, result_content)
                             break
-                        else: # "!stop"ではなかった。
-                            elapsed_time = datetime.datetime.now() - count_down_start #経過時間を計測
-                            stop_time = stop_time - int(elapsed_time.seconds)
+                        else: # "!stop"だ！
+                            await client.send_message(send_ch, "すべての処理を強制終了します。\n" + accept_count_content)
             else: # コマンド投稿者がその鯖でBAN権限を持っていなかった。
                 await client.send_message(send_ch, "<@" + message.author.id + ">\nあなたは「" + server_name + "」でのBAN権限を持っていないため、このコマンドが使えません。")
         else:
             pass
 
+client.run("NDQzNTcyNDAwMzY2NDE5OTc4.DmxJIg.0ZnXm39-FcEItKHMm6Z_V2Udzos")
 client.run("Token")
