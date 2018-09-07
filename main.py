@@ -7,7 +7,7 @@ import copy
 
 client = discord.Client()
 
-master_cmd_id = "486797480764375065" #ここに管理者連絡室内の横断BAN実行専用チャンネルのID
+master_cmd_id = "" #ここに管理者連絡室内の横断BAN実行専用チャンネルのID
 
 stop_time = 60 #実行受理から緊急停止までの猶予
 
