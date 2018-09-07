@@ -429,7 +429,9 @@ async def on_message(message):
                             await client.send_message(send_ch, result_content)
                             break
                         else: # "!stop"だ！
+                            result = "emergency_stop"
                             await client.send_message(send_ch, "すべての処理を強制終了します。\n" + accept_count_content)
+                            break
                 else:
                     pass
                 # リアクションログを保存する。
