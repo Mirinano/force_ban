@@ -203,7 +203,7 @@ async def on_message(message):
                             with open("ban_user_log.txt", "a", encoding="utf-8") as f: #ログとして保存
                                 f.write(ban_user_id + "\n")
                             file_name = file_directory + "/ban_log.txt"
-                            with open("file_name", "a", encoding="utf-8") as f:
+                            with open(file_name, "a", encoding="utf-8") as f:
                                 f.write(deal_content + "対象者\n")
                                 f.write("名前: " + ban_user.name + "\nID: " + ban_user_id + "\n\n")
                                 f.write("コマンド起動者: " + message.author.name + "\n")
@@ -225,7 +225,7 @@ async def on_message(message):
                             with open("ban_user_log.txt", "w", encoding="utf-8") as f: #ログから削除する
                                 f.write("\n".join(list(ban_user_log)))
                                 file_name = file_directory + "/unban_log.txt"
-                            with open("file_name", "a", encoding="utf-8") as f:
+                            with open(file_name, "a", encoding="utf-8") as f:
                                 f.write(deal_content + "対象者\n")
                                 f.write("名前: " + ban_user.name + "\nID: " + ban_user_id + "\n\n")
                                 f.write("コマンド起動者: " + message.author.name + "\n")
@@ -399,7 +399,7 @@ async def on_message(message):
                                     except:
                                         fail_ban_user.append(ban_user.name)
                                     file_name = file_directory + "/ban_log.txt"
-                                    with open("file_name", "a", encoding="utf-8") as f:
+                                    with open(file_name, "a", encoding="utf-8") as f:
                                         f.write(deal_content + "対象サーバー\n")
                                         f.write("名前: " + server_name + "\nID: " + server_id + "\n\n")
                                         f.write("コマンド起動者: " + message.author.name + "\n")
@@ -417,7 +417,7 @@ async def on_message(message):
                                     except:
                                         fail_ban_user.append(ban_user.name)
                                     file_name = file_directory + "/unban_log.txt"
-                                    with open("file_name", "a", encoding="utf-8") as f:
+                                    with open(file_name, "a", encoding="utf-8") as f:
                                         f.write(deal_content + "対象サーバー\n")
                                         f.write("名前: " + server_name + "\nID: " + server_id + "\n\n")
                                         f.write("コマンド起動者: " + message.author.name + "\n")
