@@ -1,12 +1,13 @@
-import asyncio
 import discord
+import asyncio
 import time
 import datetime
 import os
+import copy
 
 client = discord.Client()
 
-master_cmd_id = "" #ここに管理者連絡室内の横断BAN実行専用チャンネルのID
+master_cmd_id = "486797480764375065" #ここに管理者連絡室内の横断BAN実行専用チャンネルのID
 
 stop_time = 60 #実行受理から緊急停止までの猶予
 
@@ -65,6 +66,10 @@ async def on_message(message):
         log_f.write("内容:\n" + content + "\n")
         log_f.write("----------\n")
     if message.channel.id == master_cmd_id:
+        if message.content.startswith("$help"):
+            with open("help.txt", "r", encoding="utf-8") as f:
+                help_msg = f.read()
+            await client.send_message(msg_ch, help_msg)
         if (message.content.startswith("$force_ban") or message.content.startswith("$force_unban") or message.content.startswith("$past_ban") or message.content.startswith("$past_unban")):
             #処理番号用
             with open("accept_count.txt", "r", encoding="utf-8") as f:
@@ -100,10 +105,31 @@ async def on_message(message):
             check_msg = await client.send_message(send_ch, check_content)
             await client.add_reaction(check_msg, "⭕")
             await client.add_reaction(check_msg, "❌")
+            # これまでの情報をここで過去ログ化
+            file_directory = "ban_log/" + accept_count + "_force-" + deal
+            if not os.path.exists(file_directory):
+                os.makedirs(file_directory)
+            else:
+                pass
+            file_name = file_directory + "/detail.txt"
+            with open(file_name, "a", encoding="utf-8") as f:
+                f.write("受付番号: " + accept_count + "\n")
+                f.write("受付時間: " + message_time_str + "\n")
+                f.write(deal_content + "対象者\n")
+                f.write("名前: " + ban_user.name + "\nID: " + ban_user_id + "\n\n")
+                f.write("コマンド起動者: " + message.author.name + "\n")
             reaction_count = dict()
             reaction_count["done"] = 1 #初期化
             reaction_count["cancel"] = 1
             result = "cancel" #デフォルトでは実行しないにしておく。
+            last_done_user = {client.user}
+            last_cancel_user = {client.user}
+            done_user = ""
+            cancel_user = ""
+            result_dict = dict()
+            deal_dict = dict()
+            result_dict["done"] = list()
+            result_dict["cancel"] = list()
             loop = True
             while loop:
                 target_reaction = await client.wait_for_reaction(message=check_msg, timeout=timeout)
@@ -115,6 +141,16 @@ async def on_message(message):
                     if target_reaction.user != client.user:
                         if target_reaction.reaction.emoji == "⭕":
                             reaction_user = await client.get_reaction_users(target_reaction.reaction)
+                            #ログ機能
+                            add_user = set(reaction_user).difference(last_done_user)
+                            remove_user = last_done_user.difference(set(reaction_user))
+                            deal_dict["add_user"] = ",".join([u.name for u in add_user])
+                            deal_dict["remove_user"] = ",".join([u.name for u in remove_user])
+                            deal_dict["time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "(UTS)"
+                            done_user = "\n".join([u.name for u in reaction_user])
+                            deal_dict["count"] = str(len(reaction_user))
+                            result_dict["done"].append(copy.deepcopy(deal_dict))
+                            last_done_user = set(reaction_user) #更新
                             reaction_count["done"] = len(reaction_user)
                             if reaction_count["done"] == done_number:
                                 loop = None
@@ -123,6 +159,16 @@ async def on_message(message):
                                 pass
                         elif target_reaction.reaction.emoji == "❌":
                             reaction_user = await client.get_reaction_users(target_reaction.reaction)
+                            #ログ機能
+                            add_user = set(reaction_user).difference(last_cancel_user)
+                            remove_user = last_cancel_user.difference(set(reaction_user))
+                            deal_dict["add_user"] = ",".join([u.name for u in add_user])
+                            deal_dict["remove_user"] = ",".join([u.name for u in remove_user])
+                            deal_dict["time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "(UTS)"
+                            cancel_user = "\n".join([u.name for u in reaction_user])
+                            deal_dict["count"] = str(len(reaction_user))
+                            result_dict["cancel"].append(copy.deepcopy(deal_dict))
+                            last_cancel_user = set(reaction_user) #更新
                             reaction_count["cancel"] = len(reaction_user)
                             if reaction_count["cancel"] == cancel_number:
                                 loop = None
@@ -156,6 +202,15 @@ async def on_message(message):
                             ban_user_log.add(ban_user_id) #集合にログを追加しておく。
                             with open("ban_user_log.txt", "a", encoding="utf-8") as f: #ログとして保存
                                 f.write(ban_user_id + "\n")
+                            file_name = file_directory + "/ban_log.txt"
+                            with open("file_name", "a", encoding="utf-8") as f:
+                                f.write(deal_content + "対象者\n")
+                                f.write("名前: " + ban_user.name + "\nID: " + ban_user_id + "\n\n")
+                                f.write("コマンド起動者: " + message.author.name + "\n")
+                                f.write("実行者: " + done_user + "\n")
+                                f.write("拒否者: " + cancel_user + "\n")
+                                f.write("実行サーバー:\n" + "\n  ".join(done_server) + "\n")
+                                f.write("失敗したサーバー:\n" + "\n  ".join(fail_server) + "\n")
                         elif deal == "unban":
                             for sil in servers_id_list:
                                 try:
@@ -169,11 +224,37 @@ async def on_message(message):
                             ban_user_log.discard(ban_user_id) #集合にログを追加しておく。
                             with open("ban_user_log.txt", "w", encoding="utf-8") as f: #ログから削除する
                                 f.write("\n".join(list(ban_user_log)))
+                                file_name = file_directory + "/unban_log.txt"
+                            with open("file_name", "a", encoding="utf-8") as f:
+                                f.write(deal_content + "対象者\n")
+                                f.write("名前: " + ban_user.name + "\nID: " + ban_user_id + "\n\n")
+                                f.write("コマンド起動者: " + message.author.name + "\n")
+                                f.write("実行者: " + done_user + "\n")
+                                f.write("拒否者: " + cancel_user + "\n")
+                                f.write("実行サーバー:\n" + "\n  ".join(done_server) + "\n")
+                                f.write("失敗したサーバー:\n" + "\n  ".join(fail_server) + "\n")
                         else:
                             await client.send_message(send_ch, "【実行エラー】\n<@391943696809197568> プログラムコードに異常が起きている可能性があります。BOTを強制停止(サーバーを停止)させてください。\n" + accept_count_content) #ミリナノにメンションで警告
                         break
                     else: # "!stop"だ！
+                        result = "emergency_stop"
                         await client.send_message(send_ch, "すべての処理を強制終了します。\n" + accept_count_content)
+                        break
+            else:
+                pass
+            # リアクションログを保存する。
+            file_name = file_directory + "/reaction_log.txt"
+            with open(file_name, "a", encoding="utf-8") as f:
+                f.write("最終的アクション: " + result + "\n\n")
+                for rc in ["done", "cancel"]:
+                    f.write(rc + "ボタン\n\n")
+                    for r in result_dict[rc]:
+                        f.write("時間: " + r["time"] + "\n")
+                        f.write("追加者: " + r["add_user"] + "\n")
+                        f.write("削除者: " + r["remove_user"] + "\n")
+                        f.write("カウント:" + r["count"] + "\n")
+                        f.write("-----------------\n")
+                    f.write("\n")
         elif (message.content.startswith("$past_ban") or message.content.startswith("$past_unban")): #過去にさかのぼってログにあるすべてのアカウントをBAN(解除)します。
             if message.content.startswith("$past_ban"):
                 deal = "ban"
@@ -206,10 +287,31 @@ async def on_message(message):
                 check_msg = await client.send_message(send_ch, check_content)
                 await client.add_reaction(check_msg, "⭕")
                 await client.add_reaction(check_msg, "❌")
+                # これまでの情報をここで過去ログ化
+                file_directory = "ban_log/" + accept_count + "_past-" + deal
+                if not os.path.exists(file_directory):
+                    os.makedirs(file_directory)
+                else:
+                    pass
+                file_name = file_directory + "/detail.txt"
+                with open(file_name, "a", encoding="utf-8") as f:
+                    f.write("受付番号: " + accept_count + "\n")
+                    f.write("受付時間: " + message_time_str + "\n")
+                    f.write(deal_content + "対象サーバー\n")
+                    f.write("名前: " + server_name + "\nID: " + server_id + "\n\n")
+                    f.write("コマンド起動者: " + message.author.name + "\n")
                 reaction_count = dict()
                 reaction_count["done"] = 1 #初期化
                 reaction_count["cancel"] = 1
                 result = "cancel" #デフォルトでは実行しないにしておく。
+                last_done_user = {client.user}
+                last_cancel_user = {client.user}
+                done_user = ""
+                cancel_user = ""
+                result_dict = dict()
+                deal_dict = dict()
+                result_dict["done"] = list()
+                result_dict["cancel"] = list()
                 timeout_past = 300
                 loop = True
                 while loop:
@@ -230,6 +332,16 @@ async def on_message(message):
                             if server_permissions.ban_members:
                                 if target_reaction.reaction.emoji == "⭕":
                                     reaction_user = await client.get_reaction_users(target_reaction.reaction)
+                                    #ログ機能
+                                    add_user = set(reaction_user).difference(last_done_user)
+                                    remove_user = last_done_user.difference(set(reaction_user))
+                                    deal_dict["add_user"] = ",".join([u.name for u in add_user])
+                                    deal_dict["remove_user"] = ",".join([u.name for u in remove_user])
+                                    deal_dict["time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "(UTS)"
+                                    done_user = "\n".join([u.name for u in reaction_user])
+                                    deal_dict["count"] = str(len(reaction_user))
+                                    result_dict["done"].append(copy.deepcopy(deal_dict))
+                                    last_done_user = set(reaction_user) #更新
                                     reaction_count["done"] = len(reaction_user)
                                     if reaction_count["done"] == done_number_past:
                                         loop = None
@@ -238,6 +350,16 @@ async def on_message(message):
                                         pass
                                 elif target_reaction.reaction.emoji == "❌":
                                     reaction_user = await client.get_reaction_users(target_reaction.reaction)
+                                    #ログ機能
+                                    add_user = set(reaction_user).difference(last_cancel_user)
+                                    remove_user = last_cancel_user.difference(set(reaction_user))
+                                    deal_dict["add_user"] = ",".join([u.name for u in add_user])
+                                    deal_dict["remove_user"] = ",".join([u.name for u in remove_user])
+                                    deal_dict["time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "(UTS)"
+                                    cancel_user = "\n".join([u.name for u in reaction_user])
+                                    deal_dict["count"] = str(len(reaction_user))
+                                    result_dict["cancel"].append(copy.deepcopy(deal_dict))
+                                    last_cancel_user = set(reaction_user) #更新
                                     reaction_count["cancel"] = len(reaction_user)
                                     if reaction_count["cancel"] == cancel_number_past:
                                         loop = None
@@ -265,35 +387,67 @@ async def on_message(message):
                         stop_msg = await client.wait_for_message(timeout=stop_time, content="!stop", channel=message.channel)
                         if ((stop_msg == None) or (stop_time <= 0)):
                             await client.send_message(send_ch, deal_content + "を実行します。\n" + accept_count_content)
-                            done_user = list()
-                            fail_user = list()
+                            done_ban_user = list()
+                            fail_ban_user = list()
                             if deal == "ban":
                                 for bul in ban_user_log:
                                     ban_user = await client.get_user_info(user_id=bul)
                                     try:
                                         await force_ban(user_id=bul, server_id=server_id, delete_message_days=1)
                                         time.sleep(0.5) #0.5秒止めてAPI制限に気を付ける
-                                        done_user.append(ban_user.name)
+                                        done_ban_user.append(ban_user.name)
                                     except:
-                                        fail_user.append(ban_user.name)
+                                        fail_ban_user.append(ban_user.name)
+                                    file_name = file_directory + "/ban_log.txt"
+                                    with open("file_name", "a", encoding="utf-8") as f:
+                                        f.write(deal_content + "対象サーバー\n")
+                                        f.write("名前: " + server_name + "\nID: " + server_id + "\n\n")
+                                        f.write("コマンド起動者: " + message.author.name + "\n")
+                                        f.write("実行者: " + done_user + "\n")
+                                        f.write("拒否者: " + cancel_user + "\n")
+                                        f.write("実行ユーザー:\n" + "\n  ".join(done_ban_user) + "\n")
+                                        f.write("失敗したユーザー:\n" + "\n  ".join(fail_ban_user) + "\n")
                             elif deal == "unban":
                                 for bul in ban_user_log:
                                     ban_user = await client.get_user_info(user_id=bul)
                                     try:
                                         await force_unban(user_id=bul, server_id=server_id)
                                         time.sleep(0.5) #0.5秒止めてAPI制限に気を付ける
-                                        done_user.append(ban_user.name)
+                                        done_ban_user.append(ban_user.name)
                                     except:
-                                        fail_user.append(ban_user.name)
-                            result_content = deal_content + "が完了しました。\n実行したユーザー\n```\n" + "\n".join(done_user) + "\n```\n失敗したユーザー\n```\n" + "\n".join(fail_user) + "\n```\n" + accept_count_content
+                                        fail_ban_user.append(ban_user.name)
+                                    file_name = file_directory + "/unban_log.txt"
+                                    with open("file_name", "a", encoding="utf-8") as f:
+                                        f.write(deal_content + "対象サーバー\n")
+                                        f.write("名前: " + server_name + "\nID: " + server_id + "\n\n")
+                                        f.write("コマンド起動者: " + message.author.name + "\n")
+                                        f.write("実行者: " + done_user + "\n")
+                                        f.write("拒否者: " + cancel_user + "\n")
+                                        f.write("実行ユーザー:\n" + "\n  ".join(done_ban_user) + "\n")
+                                        f.write("失敗したユーザー:\n" + "\n  ".join(fail_ban_user) + "\n")
+                            result_content = deal_content + "が完了しました。\n実行したユーザー\n```\n" + "\n".join(done_ban_user) + "\n```\n失敗したユーザー\n```\n" + "\n".join(fail_ban_user) + "\n```\n" + accept_count_content
                             await client.send_message(send_ch, result_content)
                             break
                         else: # "!stop"だ！
                             await client.send_message(send_ch, "すべての処理を強制終了します。\n" + accept_count_content)
+                else:
+                    pass
+                # リアクションログを保存する。
+                file_name = file_directory + "/reaction_log.txt"
+                with open(file_name, "a", encoding="utf-8") as f:
+                    f.write("最終的アクション: " + result + "\n\n")
+                    for rc in ["done", "cancel"]:
+                        f.write(rc + "ボタン\n\n")
+                        for r in result_dict[rc]:
+                            f.write("時間: " + r["time"] + "\n")
+                            f.write("追加者: " + r["add_user"] + "\n")
+                            f.write("削除者: " + r["remove_user"] + "\n")
+                            f.write("カウント:" + r["count"] + "\n")
+                            f.write("-----------------\n")
+                        f.write("\n")
             else: # コマンド投稿者がその鯖でBAN権限を持っていなかった。
                 await client.send_message(send_ch, "<@" + message.author.id + ">\nあなたは「" + server_name + "」でのBAN権限を持っていないため、このコマンドが使えません。")
         else:
             pass
 
-client.run("NDQzNTcyNDAwMzY2NDE5OTc4.DmxJIg.0ZnXm39-FcEItKHMm6Z_V2Udzos")
 client.run("Token")
