@@ -57,6 +57,7 @@ async def on_message(message):
     content = message.content
     msg_server_name = message.server.name
     msg_server_id = message.server.id
+    user_roles = message.author.roles
     message_time = message.timestamp
     message_time_str = message_time.strftime("%Y/%m/%d %H:%M:%S") + "(UTS)"
     msg_time_ym = message_time.strftime("%Y-%m")
@@ -100,34 +101,33 @@ async def on_message(message):
                 help_msg = f.read()
         await client.send_message(msg_ch, help_msg)
     elif message.channel.id == master_cmd_id:
-        if message.content.startswith("$cange_msg"):
-            if "Manager" in [r.name.lower() for r in message.author.roles]:
+        if message.content.startswith("$change_msg"):
+            if "Manager" in [r.name for r in user_roles]:
                 content_list = content.split("\n")
                 content_list.pop(0) #一行目の「$change_msg」を削除。
                 cmd_line = content_list.pop(0)
-                cmd = cmd_line.split("=")
-                change_msg = "=".join(cmd[1:])
-                if change_msg in ["help", "help_other"]:
+                if cmd_line in ["help", "help_other"]:
                     change_content = "\n".join(content_list)
                     #変更を反映し、変更前と後についてのログをmsg_change_logフォルダ内に保存する。
-                    file_name = change_msg + ".txt"
-                    with open(file_name, "r+", encoding="utf-8") as f:
+                    file_name = cmd_line + ".txt"
+                    with open(file_name, "r", encoding="utf-8") as f:
                         befor_content = f.read()
+                    with open(file_name, "w", encoding="utf-8") as f:
                         f.write(change_content)
-                    log_file_name = "msg_change_log/" + change_msg + ".txt"
+                    log_file_name = "msg_change_log/" + cmd_line + ".txt"
                     with open(log_file_name, "a", encoding="utf-8") as log_f:
-                        log_f.write(message_time_str + "に" + author_name + "が" + change_msg + "を次のように変更しました。\n")
+                        log_f.write(message_time_str + "に" + author_name + "が" + cmd_line + "を次のように変更しました。\n")
                         log_f.write("変更前:\n" + befor_content + "\n")
                         log_f.write("変更後:\n" + change_content + "\n")
                         log_f.write("----------\n")
                     #変更について報告。
-                    await client.send_message(msg_ch, change_msg + "を次のように変更しました。\n変更前:\n" + befor_content + "\n変更後:\n" + change_content)
+                    await client.send_message(msg_ch, cmd_line + "を次のように変更しました。\n変更前:\n" + befor_content + "\n変更後:\n" + change_content)
                 else:
                     await client.send_message(msg_ch, "そのようなメッセージはありません。\n定義されているメッセージは「help」と「help_other」です。")
             else:
                 await client.send_message(msg_ch, "あなたをはこのコマンドを使用する権限がありません。Managerのみが使用できます。")
         elif message.content.startswith("$change_number"):
-            if "Manager" in [r.name.lower() for r in message.author.roles]:
+            if "Manager" in [r.name for r in user_roles]:
                 content_list = content.split("\n")
                 content_list.pop(0) #一行目の「$change_number」を削除。
                 err_check = True
@@ -151,7 +151,7 @@ async def on_message(message):
                     if err_check:
                         if int(new_number) < 3:
                             new_number = "3"
-                            revision_content = "※\n指定された数が3未満だったため、3に変更しました。"
+                            revision_content = "\n※指定された数が3未満だったため、3に変更しました。"
                         else:
                             revision_content = ""
                         file_name = change_num + ".txt"
@@ -167,6 +167,8 @@ async def on_message(message):
                         await client.send_message(msg_ch, err_content)
                 else:
                     await client.send_message(msg_ch, err_content)
+            else:
+                await client.send_message(msg_ch, "あなたをはこのコマンドを使用する権限がありません。Managerのみが使用できます。")
         elif message.content.startswith("$server_list"):
             server_list = list()
             with open("ban_server.txt", "r", encoding="utf-8") as f:
@@ -189,9 +191,11 @@ async def on_message(message):
             if message.content.startswith("$force_ban"):
                 deal = "ban"
                 deal_content = "BAN"
+                deal_check = False
             elif message.content.startswith("$force_unban"):
                 deal = "unban"
                 deal_content = "BANを解除"
+                deal_check = True
             send_ch = message.channel
             err_check = True
             err_content = ""
@@ -207,22 +211,24 @@ async def on_message(message):
                     err_check = False
                     err_content = "存在しないユーザーIDです。"
                 if err_check:
-                    baned_user_list = client.get_bans(message.server)
+                    baned_user_list = await client.get_bans(message.server)
                     if ((ban_user in baned_user_list) and (deal == "ban")):
+                        deal_check = True
+                    else:
+                        pass
+                    if deal_check:
                         ban_server_name = list() #初期化
                         ban_server_dict = dict() #初期化
                         with open("ban_server.txt", "r", encoding="utf-8") as f:
                             ban_server = set([s.strip() for s in f.readlines()])
                         for s in ban_server:
-                            ban_server_info = await client.get_server(id=s)
+                            ban_server_info = client.get_server(id=s)
                             ban_server_name.append(ban_server_info.name)
                             ban_server_dict[ban_server_info.id] = ban_server_info.name
                         with open("done_number.txt", "r", encoding="utf-8") as f:
                             done_number = int(f.read())
                         with open("cancel_number.txt", "r", encoding="utf-8") as f:
                             cancel_number = int(f.read())
-                        print(done_number)
-                        print(cancel_number)
                         content = "次のユーザーをこのBOTを導入している次のサーバーすべてで" + deal_content +"します。\n"
                         ban_user_info = "名前: " + ban_user.name + "\nメンション: <@" + ban_user_id + ">\n"
                         ban_server_content = "```" + "\n".join(ban_server_name) + "```\n"
